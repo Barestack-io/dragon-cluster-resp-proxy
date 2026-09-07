@@ -1,0 +1,60 @@
+# dragon-cluster-resp-proxy configuration.
+# Environment variables with prefix DCRP_ override every field (env always wins).
+# Example: DCRP_UNIX_SOCKET=/var/run/dcrp.sock DCRP_CLUSTER_SEEDS=10.0.0.1:6379,10.0.0.2:6379
+
+unix_socket: /tmp/dragon-cluster-resp-proxy.sock
+unix_socket_mode: "0770"
+
+# One or more cluster seed addresses. The proxy discovers the rest via CLUSTER SHARDS/SLOTS.
+cluster_seeds:
+  - 127.0.0.1:6379
+cluster_username: ""
+cluster_password: ""
+
+tls:
+  enabled: false
+  ca_file: ""
+  cert_file: ""
+  key_file: ""
+  insecure_skip_verify: false
+
+# auto | dragonfly | redis
+backend_flavor: auto
+
+pool_min_per_node: 2
+pool_max_per_node: 64
+dial_timeout: 3s
+read_timeout: 30s
+write_timeout: 5s
+reconnect_backoff_min: 50ms
+reconnect_backoff_max: 2s
+topology_refresh: 10s
+max_client_conns: 100000
+blocking_max_wait: 60s
+moved_hop_limit: 5
+
+metrics_addr: ":9294"
+log_level: info
+pprof: false
+pprof_addr: 127.0.0.1:6264
+shutdown_timeout: 15s
+
+# Off by default. Dragonfly READONLY is a stub; Redis replicas get READONLY on the conn.
+read_from_replicas: false
+
+# Optional AUTH required from unix-socket clients.
+client_auth_password: ""
+
+# Dragonfly locktag_* escape hatch. Default is Redis {} hash tags.
+hash_tag_open: "{"
+hash_tag_close: "}"
+
+# Optional advertised-address rewrite (SSH tunnels / NAT).
+# Format in env: DCRP_ADDRESS_MAP=192.168.0.131:6383=127.0.0.1:16383,192.168.0.18:6383=127.0.0.1:26383
+address_map: {}
+
+# Virtual numbered databases. SELECT 0 is unprefixed; SELECT N (N>0) stores keys as dbN:<key>.
+max_databases: 16
+
+# Max commands coalesced into one backend write/read burst (client pipelining).
+max_pipeline: 128

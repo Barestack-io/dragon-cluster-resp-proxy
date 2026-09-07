@@ -1,0 +1,49 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - name: test
+        run: go test -race ./...
+      - name: next version
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)
+          if [ -z "${latest}" ]; then
+            next="v0.1.0"
+          else
+            raw=${latest#v}
+            IFS=. read -r major minor patch <<EOF
+          $raw
+          EOF
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "tag=${next}" >> "$GITHUB_OUTPUT"
+          echo "next release ${next} (previous ${latest:-none})"
+      - name: tag
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

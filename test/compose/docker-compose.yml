@@ -1,0 +1,31 @@
+# Integration backends. Dragonfly will not self-form a cluster; tests push DFLYCLUSTER CONFIG.
+services:
+  dragonfly-a:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+    command: ["dragonfly", "--logtostderr", "--cluster_mode=yes", "--port=6379", "--bind=0.0.0.0", "--cluster_announce_ip=dragonfly-a"]
+    ports:
+      - "16379:6379"
+
+  dragonfly-b:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+    command: ["dragonfly", "--logtostderr", "--cluster_mode=yes", "--port=6379", "--bind=0.0.0.0", "--cluster_announce_ip=dragonfly-b"]
+    ports:
+      - "16380:6379"
+
+  redis-node-0:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--port", "6379", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--bind", "0.0.0.0"]
+    ports:
+      - "17000:6379"
+
+  redis-node-1:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--port", "6379", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--bind", "0.0.0.0"]
+    ports:
+      - "17001:6379"
+
+  redis-node-2:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--port", "6379", "--cluster-enabled", "yes", "--cluster-config-file", "nodes.conf", "--bind", "0.0.0.0"]
+    ports:
+      - "17002:6379"

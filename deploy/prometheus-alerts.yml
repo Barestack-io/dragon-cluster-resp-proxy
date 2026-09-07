@@ -1,0 +1,51 @@
+groups:
+  - name: dragon-cluster-resp-proxy
+    rules:
+      # 5m error rate > 1% of traffic
+      - alert: DCRPHighErrorRate
+        expr: |
+          sum(rate(dragon_cluster_resp_proxy_commands_total{result="error"}[5m]))
+          /
+          sum(rate(dragon_cluster_resp_proxy_commands_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High proxy command error rate
+
+      - alert: DCRPHighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(dragon_cluster_resp_proxy_command_duration_seconds_bucket[5m])) by (le)
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Proxy P99 latency above 10ms
+
+      - alert: DCRPPoolWaiters
+        expr: sum(dragon_cluster_resp_proxy_pool_connections{state="waiters"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Clients waiting on backend pool connections
+
+      - alert: DCRPTopologyRefreshFailing
+        expr: |
+          increase(dragon_cluster_resp_proxy_topology_refresh_total{result="error"}[15m]) > 3
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Cluster topology refresh is failing
+
+      - alert: DCRPClusterNotConfigured
+        expr: |
+          increase(dragon_cluster_resp_proxy_backend_errors_total{class="cluster_not_configured"}[10m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Dragonfly nodes report cluster not yet configured

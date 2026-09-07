@@ -1,0 +1,39 @@
+version: 2
+
+project_name: dragon-cluster-resp-proxy
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: dragon-cluster-resp-proxy
+    main: ./cmd/dragon-cluster-resp-proxy
+    binary: dragon-cluster-resp-proxy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/barestack/dragon-cluster-resp-proxy/internal/version.Version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  name_template: "dragon-cluster-resp-proxy {{.Tag}}"
