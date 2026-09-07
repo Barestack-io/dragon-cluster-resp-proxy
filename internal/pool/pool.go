@@ -183,7 +183,7 @@ func (p *Pool) dial(ctx context.Context) (*Conn, error) {
 	if p.opts.TLS != nil {
 		tconn := tls.Client(nc, p.opts.TLS)
 		if err := tconn.HandshakeContext(dctx); err != nil {
-			nc.Close()
+			_ = nc.Close()
 			return nil, err
 		}
 		nc = tconn

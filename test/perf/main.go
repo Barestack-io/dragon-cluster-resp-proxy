@@ -35,7 +35,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			defer c.Close()
+			defer func() { _ = c.Close() }()
 			r := resp.NewReader(c)
 			buf := make([]byte, 0, 8*1024)
 			sent := 0

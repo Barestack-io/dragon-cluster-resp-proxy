@@ -290,7 +290,7 @@ func ParseShards(v resp.Value) (*Topology, error) {
 				}
 			}
 		}
-		var masterIdx int = -1
+		masterIdx := -1
 		for _, n := range nodes {
 			if n.Health == HealthHidden {
 				continue

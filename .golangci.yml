@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -8,8 +10,10 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
+  settings:
+    errcheck:
+      check-type-assertions: false
 
-linters-settings:
-  errcheck:
-    check-type-assertions: false
+formatters:
+  enable:
+    - gofmt

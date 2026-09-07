@@ -30,7 +30,7 @@ func TestLocalPINGAndSELECT(t *testing.T) {
 	defer stop()
 
 	c := dialUnix(t, sock)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mustOK(t, c, encodeCmd("PING"), "+PONG")
 	mustOK(t, c, encodeCmd("SELECT", "0"), "+OK")
 	mustOK(t, c, encodeCmd("SELECT", "4"), "+OK")
@@ -44,7 +44,7 @@ func TestVirtualDBPrefixesKeys(t *testing.T) {
 	defer stop()
 
 	c := dialUnix(t, sock)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mustOK(t, c, encodeCmd("SELECT", "4"), "+OK")
 	got := exchange(t, c, encodeCmd("GET", "hello"))
 	if !strings.Contains(got, "db4-world") {
@@ -63,7 +63,7 @@ func TestCrossSlotRejected(t *testing.T) {
 	defer stop()
 
 	c := dialUnix(t, sock)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mustContain(t, c, encodeCmd("MGET", "alpha", "zzzzzzzz"), "CROSSSLOT")
 }
 
@@ -115,7 +115,7 @@ func TestClientPipeline(t *testing.T) {
 	defer stop()
 
 	c := dialUnix(t, sock)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	frame := append(encodeCmd("GET", "hello"), encodeCmd("GET", "db4:hello")...)
 	_ = c.SetDeadline(time.Now().Add(3 * time.Second))
 	if _, err := c.Write(frame); err != nil {
@@ -144,7 +144,7 @@ func TestGETProxied(t *testing.T) {
 	defer stop()
 
 	c := dialUnix(t, sock)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	got := exchange(t, c, encodeCmd("GET", "hello"))
 	if !strings.Contains(got, "world") {
 		t.Fatalf("reply %q", got)
@@ -271,7 +271,7 @@ func startFakeCluster(t *testing.T) net.Listener {
 }
 
 func serveFake(c net.Conn, self string) {
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	r := resp.NewReader(c)
 	host, port, _ := strings.Cut(self, ":")
 	slots := clusterSlotsReply(host, port)

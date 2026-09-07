@@ -24,7 +24,7 @@ func TestPoolGetPut(t *testing.T) {
 				return
 			}
 			wg.Go(func() {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				r := resp.NewReader(c)
 				for {
 					if _, err := r.ReadValue(); err != nil {
@@ -79,7 +79,7 @@ func TestPutAfterClose(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer c.Close()
+		defer func() { _ = c.Close() }()
 		buf := make([]byte, 64)
 		_, _ = c.Read(buf)
 	}()
