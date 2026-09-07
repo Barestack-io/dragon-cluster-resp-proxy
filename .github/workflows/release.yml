@@ -38,6 +38,8 @@ jobs:
           echo "next release ${next} (previous ${latest:-none})"
       - name: tag
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
           git push origin "${{ steps.version.outputs.tag }}"
       - uses: goreleaser/goreleaser-action@v6
