@@ -202,6 +202,9 @@ func (s *session) handle(ctx context.Context, argv [][]byte, raw []byte) error {
 
 	keys := command.ExtractKeys(argv)
 	if len(keys) > 1 && s.router.CrossSlot(keys) {
+		if command.FanoutOf(argv) != command.FanoutNone {
+			return s.cmdFanout(ctx, argv, name, start)
+		}
 		s.observe(name, "error", start)
 		return s.reply(errCross)
 	}
@@ -245,6 +248,70 @@ func (s *session) handle(ctx context.Context, argv [][]byte, raw []byte) error {
 		reply = command.StripReplyKeys(name, s.db, reply)
 	}
 	s.observe(name, result, start)
+	return s.reply(reply)
+}
+
+func (s *session) cmdFanout(ctx context.Context, argv [][]byte, name string, start time.Time) error {
+	keys := command.ExtractKeys(argv)
+	groups := command.GroupBySlot(keys, s.router.SlotOf)
+	if len(groups) == 0 {
+		s.observe(name, "error", start)
+		return s.reply(errCross)
+	}
+	read := command.KindOf(argv[0]) == command.KindRead
+	readTO := s.cfg.ReadTimeout
+	replies := make([]resp.Value, len(groups))
+	errCh := make(chan error, len(groups))
+	var wg sync.WaitGroup
+	for i, g := range groups {
+		i, g := i, g
+		sub := command.RebuildFanoutArgv(argv, g)
+		wg.Go(func() {
+			v, err := s.router.Exec(ctx, g.Slot, sub, read, readTO)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			replies[i] = v
+			errCh <- nil
+		})
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			s.observe(name, "error", start)
+			return s.reply(resp.Error("ERR " + err.Error()))
+		}
+	}
+	for _, r := range replies {
+		if r.IsError() {
+			result := classifyErr(r)
+			s.observe(name, result, start)
+			if r.EqualKind("MOVED") || r.EqualKind("ASK") {
+				return s.reply(resp.Error("ERR backend redirect exhausted"))
+			}
+			return s.reply(r)
+		}
+	}
+	var reply resp.Value
+	switch command.FanoutOf(argv) {
+	case command.FanoutSum:
+		reply = command.MergeSum(replies)
+	case command.FanoutMGet:
+		reply = command.MergeMGet(len(keys), groups, replies)
+	case command.FanoutMSet:
+		reply = command.MergeMSet(replies)
+	default:
+		s.observe(name, "error", start)
+		return s.reply(errCross)
+	}
+	if reply.IsError() {
+		s.observe(name, classifyErr(reply), start)
+		return s.reply(reply)
+	}
+	reply = command.StripReplyKeys(name, s.db, reply)
+	s.observe(name, "ok", start)
 	return s.reply(reply)
 }
 

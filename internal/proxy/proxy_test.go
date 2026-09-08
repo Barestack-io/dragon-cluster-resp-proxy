@@ -57,14 +57,47 @@ func TestVirtualDBPrefixesKeys(t *testing.T) {
 	}
 }
 
-func TestCrossSlotRejected(t *testing.T) {
+func TestCrossSlotFanout(t *testing.T) {
 	backend := startFakeCluster(t)
 	sock, stop := startProxy(t, backend.Addr().String())
 	defer stop()
 
 	c := dialUnix(t, sock)
 	defer func() { _ = c.Close() }()
-	mustContain(t, c, encodeCmd("MGET", "alpha", "zzzzzzzz"), "CROSSSLOT")
+	mustOK(t, c, encodeCmd("MGET", "alpha", "zzzzzzzz"), "*2")
+	mustOK(t, c, encodeCmd("DEL", "alpha", "zzzzzzzz"), ":2")
+	mustOK(t, c, encodeCmd("MSET", "alpha", "1", "zzzzzzzz", "2"), "+OK")
+	mustContain(t, c, encodeCmd("SINTER", "alpha", "zzzzzzzz"), "CROSSSLOT")
+	mustContain(t, c, encodeCmd("MSETNX", "alpha", "1", "zzzzzzzz", "2"), "CROSSSLOT")
+}
+
+func TestCrossSlotFanoutPipeline(t *testing.T) {
+	backend := startFakeCluster(t)
+	sock, stop := startProxy(t, backend.Addr().String())
+	defer stop()
+
+	c := dialUnix(t, sock)
+	defer func() { _ = c.Close() }()
+	frame := append(encodeCmd("PING"), encodeCmd("MGET", "alpha", "zzzzzzzz")...)
+	_ = c.SetDeadline(time.Now().Add(3 * time.Second))
+	if _, err := c.Write(frame); err != nil {
+		t.Fatal(err)
+	}
+	r := resp.NewReader(c)
+	pong, err := r.ReadValue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(pong.Str) != "PONG" {
+		t.Fatalf("first %q", pong.Str)
+	}
+	arr, err := r.ReadValue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if arr.Type != resp.TypeArray || len(arr.Values) != 2 {
+		t.Fatalf("MGET %+v", arr)
+	}
 }
 
 func TestDrainBatchCoalescesWrites(t *testing.T) {
@@ -305,6 +338,18 @@ func serveFake(c net.Conn, self string) {
 			default:
 				out = resp.Encode(nil, resp.NullBulk())
 			}
+		case "DEL", "UNLINK", "EXISTS", "TOUCH":
+			n := int64(len(argv) - 1)
+			if n < 0 {
+				n = 0
+			}
+			out = resp.Encode(nil, resp.Integer(n))
+		case "MGET":
+			items := make([]resp.Value, 0, len(argv)-1)
+			for i := 1; i < len(argv); i++ {
+				items = append(items, resp.NullBulk())
+			}
+			out = resp.Encode(nil, resp.Array(items...))
 		default:
 			out = resp.Encode(nil, resp.SimpleString("OK"))
 		}

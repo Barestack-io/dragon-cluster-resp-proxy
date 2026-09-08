@@ -81,6 +81,16 @@ Dragonfly cluster has no numbered DBs. The proxy keeps a per-session `SELECT` an
 
 Reads/writes, `WATCH`, Lua `KEYS`, `SCAN`/`KEYS` patterns, `COPY`/`MOVE`, and key-echoing replies are translated. Pub/sub channels are not prefixed. `FLUSHALL` and `SWAPDB` are rejected.
 
+## Multi-key commands
+
+Standalone clients can send multi-key commands without hash tags. The proxy splits independent per-key ops by slot, runs the groups in parallel, and merges replies:
+
+- `DEL` / `UNLINK` / `EXISTS` / `TOUCH` — integer replies are summed
+- `MGET` — array in the original key order
+- `MSET` — `OK` if every group succeeds
+
+Transactional or algebraic multi-key ops stay rejected with `CROSSSLOT`: `MSETNX`, `SINTER` / `SUNION` / `SDIFF` and `*STORE`, `SINTERCARD`, `ZUNION*` / `ZINTER*` / `ZDIFF*`, `BITOP`, `PFCOUNT` / `PFMERGE`, `RENAME` / `RENAMENX`, `SMOVE`, `LMOVE`, multi-key `BLPOP` / `BRPOP` / `BZPOP*`, multi-key `EVAL*`, `WATCH`, and `MULTI` spanning slots.
+
 ## Dragonfly notes
 
 - Hash slots are the Redis 16,384-slot space: `crc16(tag(key)) & 0x3FFF`. The proxy does not hardcode a 2-way split; it uses whatever `CLUSTER SLOTS` reports.
@@ -122,7 +132,7 @@ Local compose backends: [`test/compose/docker-compose.yml`](test/compose/docker-
 cmd/dragon-cluster-resp-proxy/   entrypoint
 internal/proxy/                  unix listener, sessions, pipelining, virtual DBs
 internal/cluster/                slots, topology, MOVED, pools
-internal/command/                command table, key extraction, DB prefix
+internal/command/                command table, key extraction, DB prefix, fan-out
 internal/pubsub/                 Dragonfly sharded rewrite
 internal/resp/                   RESP codec
 internal/config/                 YAML + DCRP_* env

@@ -154,6 +154,10 @@ func (s *session) classifyPipe(c clientCmd) pipeItem {
 	}
 	keys := command.ExtractKeys(argv)
 	if len(keys) > 1 && s.router.CrossSlot(keys) {
+		if command.FanoutOf(argv) != command.FanoutNone {
+			it.slow = true
+			return it
+		}
 		it.local, it.hasLocal = errCross, true
 		return it
 	}
