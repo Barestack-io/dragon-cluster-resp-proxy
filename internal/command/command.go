@@ -22,6 +22,16 @@ const (
 	KindAdmin
 )
 
+// Fanout says how a multi-key command can be split across slots.
+type Fanout uint8
+
+const (
+	FanoutNone Fanout = iota
+	FanoutSum
+	FanoutMGet
+	FanoutMSet
+)
+
 // KeySpec describes 1-based key positions in argv after the command name
 // (Redis COMMAND INFO convention). Last=-1 means last argument.
 type KeySpec struct {
@@ -32,9 +42,10 @@ type KeySpec struct {
 
 // Meta is static command metadata.
 type Meta struct {
-	Name string
-	Kind Kind
-	Keys KeySpec
+	Name   string
+	Kind   Kind
+	Keys   KeySpec
+	Fanout Fanout
 }
 
 // Lookup returns metadata for an uppercase command name.
@@ -355,6 +366,19 @@ func ClassifyPubSub(argv0 []byte) PubSubOp {
 	default:
 		return PubSubNone
 	}
+}
+
+// FanoutOf returns how argv can be split across slots.
+func FanoutOf(argv [][]byte) Fanout {
+	if len(argv) == 0 {
+		return FanoutNone
+	}
+	name := make([]byte, len(argv[0]))
+	resp.UpperASCII(name, argv[0])
+	if m, ok := table[string(name)]; ok {
+		return m.Fanout
+	}
+	return FanoutNone
 }
 
 // KindOf returns the kind for argv[0].
